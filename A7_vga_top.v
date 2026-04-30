@@ -27,6 +27,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 module vga_top(
     input  ClkPort,
+    input  SW0,
     input  BtnC,
     input  BtnU,
     input  BtnR,
@@ -131,12 +132,15 @@ module vga_top(
     );
 
     // -------------------------------------------------------
-    // Paddle: controlled by ADXL362 X-axis
+    // Paddle: buttons when SW0=0, accelerometer when SW0=1
     // -------------------------------------------------------
     pong_paddle paddle_ctrl(
         .clk           (move_clk),
         .bright        (bright),
         .rst           (BtnC),
+        .use_accel     (SW0),
+        .btn_left      (BtnL),
+        .btn_right     (BtnR),
         .accel_x       (accel_x_data),
         .shrink_level  (paddle_shrink_level),
         .hCount        (hc),

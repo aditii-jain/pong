@@ -14,6 +14,9 @@ module pong_paddle(
     input  wire        clk,        // slow movement clock (~190 Hz)
     input  wire        bright,
     input  wire        rst,
+    input  wire        use_accel,
+    input  wire        btn_left,
+    input  wire        btn_right,
     input  wire [7:0]  accel_x,    // signed 8-bit X acceleration from ADXL362
     input  wire [3:0]  shrink_level,
     input  wire [9:0]  hCount,
@@ -43,13 +46,16 @@ module pong_paddle(
     // Interpret incoming byte as signed
     wire signed [7:0] ax = $signed(accel_x);
 
-    // Dead zone ±15 LSB (~0.23 g); speed tiers at ±40 and ±80
-    wire        go_right = (ax > 8'sd15);
-    wire        go_left  = (ax < -8'sd15);
+    wire accel_go_right;
+    wire accel_go_left;
+    wire btn_go_right;
+    wire btn_go_left;
+    wire go_right;
+    wire go_left;
 
-    // Pixels to move each movement-clock tick
-    wire [9:0]  step = ((ax > 8'sd80) || (ax < -8'sd80)) ? 10'd3 :
-                       ((ax > 8'sd40) || (ax < -8'sd40)) ? 10'd2 : 10'd1;
+    wire [9:0] accel_step;
+    wire [9:0] btn_step;
+    wire [9:0] step;
 
     // Paddle center; Y is fixed (horizontal-only motion)
     reg [9:0] paddle_x;
@@ -61,6 +67,21 @@ module pong_paddle(
     // Each shrink step removes ~10% of the original total width.
     assign paddle_half_w = (shrink_level >= 4'd7) ? MIN_PADDLE_HALF_W :
                            (PADDLE_HALF_W - (shrink_level * 10'd4));
+
+    // Dead zone ±15 LSB (~0.23 g); speed tiers at ±40 and ±80.
+    assign accel_go_right = (ax > 8'sd15);
+    assign accel_go_left  = (ax < -8'sd15);
+    assign accel_step = ((ax > 8'sd80) || (ax < -8'sd80)) ? 10'd3 :
+                        ((ax > 8'sd40) || (ax < -8'sd40)) ? 10'd2 : 10'd1;
+
+    // Button mode uses fixed-speed left/right movement.
+    assign btn_go_left  = btn_left  && !btn_right;
+    assign btn_go_right = btn_right && !btn_left;
+    assign btn_step = 10'd2;
+
+    assign go_left  = use_accel ? accel_go_left  : btn_go_left;
+    assign go_right = use_accel ? accel_go_right : btn_go_right;
+    assign step     = use_accel ? accel_step     : btn_step;
 
     // Pixel colour output
     always @(*) begin
