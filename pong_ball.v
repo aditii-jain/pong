@@ -11,7 +11,8 @@ module pong_ball(
     input [9:0] paddle_bottom,
     input [9:0] hCount, vCount,
     output reg [11:0] rgb,
-    output reg [11:0] background
+    output reg [11:0] background,
+    output reg paddle_hit_pulse
     );
 
     // Visible area from display_controller timing:
@@ -77,7 +78,9 @@ module pong_ball(
             ypos <= 11'sd275;
             vx <= 11'sd1;
             vy <= -11'sd1;
+            paddle_hit_pulse <= 1'b0;
         end else begin
+            paddle_hit_pulse <= 1'b0;
 
             // Per-frame update model:
             // x = x + vx, y = y + vy
@@ -108,6 +111,7 @@ module pong_ball(
             if (paddle_hit) begin
                 next_vy = -next_vy;
                 next_y = $signed({1'b0, paddle_top}) - BALL_HALF_SIZE - 11'sd1;
+                paddle_hit_pulse <= 1'b1;
             end
 
             xpos <= next_x;
