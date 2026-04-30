@@ -90,8 +90,8 @@ module pong_ball(
             // x = x + vx, y = y + vy
             next_vx = vx;
             next_vy = vy;
-            // Increase speed more gradually: each pair of levels adds 1 pixel/tick.
-            speed_step = $signed({8'd0, (speed_level >> 1)}) + 11'sd1;
+            // speed_level is the number of extra pixels/tick above the base speed.
+            speed_step = $signed({7'd0, speed_level}) + 11'sd1;
             step_x = (vx < 0) ? -speed_step : speed_step;
             step_y = (vy < 0) ? -speed_step : speed_step;
             next_x = xpos + step_x;
