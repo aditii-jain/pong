@@ -4,6 +4,7 @@ module pong_ball(
     input clk, // slow movement clock, similar to block_controller
     input bright,
     input rst,
+    input [3:0] speed_level,
     // Paddle bounding box (for collision handling)
     input [9:0] paddle_left,
     input [9:0] paddle_right,
@@ -35,6 +36,8 @@ module pong_ball(
     reg signed [10:0] next_y;
     reg signed [10:0] next_vx;
     reg signed [10:0] next_vy;
+    reg signed [10:0] step_x;
+    reg signed [10:0] step_y;
 
     wire ball_fill;
     wire paddle_hit;
@@ -86,8 +89,12 @@ module pong_ball(
             // x = x + vx, y = y + vy
             next_vx = vx;
             next_vy = vy;
-            next_x = xpos + next_vx;
-            next_y = ypos + next_vy;
+            step_x = (vx < 0) ? -$signed({7'd0, speed_level}) - 11'sd1
+                              :  $signed({7'd0, speed_level}) + 11'sd1;
+            step_y = (vy < 0) ? -$signed({7'd0, speed_level}) - 11'sd1
+                              :  $signed({7'd0, speed_level}) + 11'sd1;
+            next_x = xpos + step_x;
+            next_y = ypos + step_y;
 
             // Left/right wall bounce: flip only vx
             if ((next_x - BALL_HALF_SIZE) <= $signed({1'b0, H_MIN})) begin

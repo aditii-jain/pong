@@ -70,6 +70,8 @@ module vga_top(
     reg [5:0]   elapsed_seconds;
     reg [5:0]   elapsed_minutes;
     reg [13:0]  score;
+    wire [3:0]  ball_speed_level;
+    wire [3:0]  paddle_shrink_level;
 
     // -------------------------------------------------------
     // Clock divider
@@ -128,6 +130,7 @@ module vga_top(
         .bright        (bright),
         .rst           (BtnC),
         .accel_x       (accel_x_data),
+        .shrink_level  (paddle_shrink_level),
         .hCount        (hc),
         .vCount        (vc),
         .paddle_left   (paddle_left),
@@ -145,6 +148,7 @@ module vga_top(
         .clk           (move_clk),
         .bright        (bright),
         .rst           (BtnC),
+        .speed_level   (ball_speed_level),
         .paddle_left   (paddle_left),
         .paddle_right  (paddle_right),
         .paddle_top    (paddle_top),
@@ -209,6 +213,10 @@ module vga_top(
                 score <= score + 14'd1;
         end
     end
+
+    // Difficulty ramps with score and allows overlapping milestones.
+    assign ball_speed_level    = (score / 14'd5 >= 14'd4) ? 4'd4 : (score / 14'd5);
+    assign paddle_shrink_level = (score / 14'd7 >= 14'd7) ? 4'd7 : (score / 14'd7);
 
     // -------------------------------------------------------
     // Seven-segment display

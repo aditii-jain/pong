@@ -15,6 +15,7 @@ module pong_paddle(
     input  wire        bright,
     input  wire        rst,
     input  wire [7:0]  accel_x,    // signed 8-bit X acceleration from ADXL362
+    input  wire [3:0]  shrink_level,
     input  wire [9:0]  hCount,
     input  wire [9:0]  vCount,
     output wire [9:0]  paddle_left,
@@ -34,6 +35,7 @@ module pong_paddle(
     // Paddle geometry
     localparam [9:0] PADDLE_HALF_W = 10'd35;  // total width  70 px
     localparam [9:0] PADDLE_HALF_H = 10'd6;   // total height 12 px
+    localparam [9:0] MIN_PADDLE_HALF_W = 10'd8;
 
     localparam [11:0] PADDLE_COLOR = 12'b1111_1111_1111; // white
     localparam [11:0] BG_COLOR     = 12'b0000_0000_0000; // black
@@ -54,6 +56,11 @@ module pong_paddle(
     reg [9:0] paddle_y;
 
     wire paddle_fill;
+    wire [9:0] paddle_half_w;
+
+    // Each shrink step removes ~10% of the original total width.
+    assign paddle_half_w = (shrink_level >= 4'd7) ? MIN_PADDLE_HALF_W :
+                           (PADDLE_HALF_W - (shrink_level * 10'd4));
 
     // Pixel colour output
     always @(*) begin
@@ -65,13 +72,13 @@ module pong_paddle(
             rgb = background;
     end
 
-    assign paddle_fill   = (hCount >= (paddle_x - PADDLE_HALF_W)) &&
-                           (hCount <= (paddle_x + PADDLE_HALF_W)) &&
+    assign paddle_fill   = (hCount >= (paddle_x - paddle_half_w)) &&
+                           (hCount <= (paddle_x + paddle_half_w)) &&
                            (vCount >= (paddle_y - PADDLE_HALF_H)) &&
                            (vCount <= (paddle_y + PADDLE_HALF_H));
 
-    assign paddle_left   = paddle_x - PADDLE_HALF_W;
-    assign paddle_right  = paddle_x + PADDLE_HALF_W;
+    assign paddle_left   = paddle_x - paddle_half_w;
+    assign paddle_right  = paddle_x + paddle_half_w;
     assign paddle_top    = paddle_y - PADDLE_HALF_H;
     assign paddle_bottom = paddle_y + PADDLE_HALF_H;
 
@@ -82,15 +89,19 @@ module pong_paddle(
             paddle_y <= 10'd490;  // near bottom of visible area
         end else begin
             if (go_right && !go_left) begin
-                if (paddle_x < H_MAX - PADDLE_HALF_W - step)
+                if (paddle_x < H_MAX - paddle_half_w - step)
                     paddle_x <= paddle_x + step;
                 else
-                    paddle_x <= H_MAX - PADDLE_HALF_W;
+                    paddle_x <= H_MAX - paddle_half_w;
             end else if (go_left && !go_right) begin
-                if (paddle_x > H_MIN + PADDLE_HALF_W + step)
+                if (paddle_x > H_MIN + paddle_half_w + step)
                     paddle_x <= paddle_x - step;
                 else
-                    paddle_x <= H_MIN + PADDLE_HALF_W;
+                    paddle_x <= H_MIN + paddle_half_w;
+            end else if (paddle_x > H_MAX - paddle_half_w) begin
+                paddle_x <= H_MAX - paddle_half_w;
+            end else if (paddle_x < H_MIN + paddle_half_w) begin
+                paddle_x <= H_MIN + paddle_half_w;
             end
             // Y stays fixed
         end
