@@ -113,6 +113,10 @@ set_property PACKAGE_PIN B12 [get_ports vSync]
 set_property PACKAGE_PIN L13 [get_ports QuadSpiFlashCS]					
 	set_property IOSTANDARD LVCMOS33 [get_ports QuadSpiFlashCS]
 
+## USB-UART bridge (FPGA transmit to computer terminal)
+set_property PACKAGE_PIN D4 [get_ports RsTx]
+	set_property IOSTANDARD LVCMOS33 [get_ports RsTx]
+
 ## NOTE: RamCS / MemOE / MemWR are not used in vga_top; leave commented out.
 # set_property PACKAGE_PIN L18 [get_ports RamCS]
 # set_property PACKAGE_PIN H14 [get_ports MemOE]
@@ -122,15 +126,15 @@ set_property PACKAGE_PIN L13 [get_ports QuadSpiFlashCS]
 ## On-board ADXL362 accelerometer (SPI interface)
 ## Nexys A7 master XDC pin assignments
 ## -----------------------------------------------------------------------
-set_property PACKAGE_PIN E15 [get_ports acl_csn]
+set_property PACKAGE_PIN D15 [get_ports acl_csn]
 	set_property IOSTANDARD LVCMOS33 [get_ports acl_csn]
 
-set_property PACKAGE_PIN D15 [get_ports acl_sclk]
+set_property PACKAGE_PIN F15 [get_ports acl_sclk]
 	set_property IOSTANDARD LVCMOS33 [get_ports acl_sclk]
 
-set_property PACKAGE_PIN A14 [get_ports acl_mosi]
+set_property PACKAGE_PIN F14 [get_ports acl_mosi]
 	set_property IOSTANDARD LVCMOS33 [get_ports acl_mosi]
 
-set_property PACKAGE_PIN B14 [get_ports acl_miso]
+set_property PACKAGE_PIN E15 [get_ports acl_miso]
 	set_property IOSTANDARD LVCMOS33 [get_ports acl_miso]
 

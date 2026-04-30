@@ -47,7 +47,8 @@ module vga_top(
     output acl_mosi,  // FPGA → accelerometer
     input  acl_miso,  // accelerometer → FPGA
 
-    output QuadSpiFlashCS
+    output QuadSpiFlashCS,
+    output RsTx
     );
 
     wire Reset;
@@ -95,6 +96,13 @@ module vga_top(
         .acl_miso   (acl_miso),
         .x_data     (accel_x_data),
         .data_valid (accel_valid)
+    );
+
+    uart_accel_debug accel_console(
+        .clk    (ClkPort),
+        .rst    (Reset),
+        .x_data (accel_x_data),
+        .tx     (RsTx)
     );
 
     // -------------------------------------------------------
@@ -164,12 +172,12 @@ module vga_top(
     assign QuadSpiFlashCS = 1'b1;
 
     // -------------------------------------------------------
-    // Seven-segment display (shows background colour word)
+    // Seven-segment display (available for score/time)
     // -------------------------------------------------------
     assign SSD3 = 4'b0000;
-    assign SSD2 = background[11:8];
-    assign SSD1 = background[7:4];
-    assign SSD0 = background[3:0];
+    assign SSD2 = 4'b0000;
+    assign SSD1 = 4'b0000;
+    assign SSD0 = 4'b0000;
 
     assign ssdscan_clk = DIV_CLK[19:18];
     assign An0 = !(~ssdscan_clk[1] && ~ssdscan_clk[0]);
