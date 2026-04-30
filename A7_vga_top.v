@@ -27,6 +27,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 module vga_top(
     input  ClkPort,
+    input  SW0,
     input  BtnC,
     input  BtnU,
     input  BtnR,
@@ -153,12 +154,15 @@ module vga_top(
     );
 
     // -------------------------------------------------------
-    // Paddle: controlled by ADXL362 X-axis
+    // Paddle: buttons when SW0=0, accelerometer when SW0=1
     // -------------------------------------------------------
     pong_paddle paddle_ctrl(
         .clk           (move_clk),
         .bright        (bright),
         .rst           (BtnC),
+        .use_accel     (SW0),
+        .btn_left      (BtnU),
+        .btn_right     (BtnD),
         .accel_x       (accel_x_data),
         .shrink_level  (paddle_shrink_level),
         .hCount        (hc),
@@ -338,7 +342,11 @@ module vga_top(
     assign ball3_active = (level >= 4'd4);
 
     // Difficulty ramps with score and allows overlapping milestones.
-    assign ball_speed_level    = (score / 14'd5 >= 14'd4) ? 4'd4 : (score / 14'd5);
+    // Ball speed: 0-4 => base, 5-14 => +1, 15-24 => +2, then +1 every 10 points.
+    assign ball_speed_level    = (score < 14'd5)  ? 4'd0 :
+                                 (score < 14'd15) ? 4'd1 :
+                                 (score < 14'd25) ? 4'd2 :
+                                 (score < 14'd35) ? 4'd3 : 4'd4;
     assign paddle_shrink_level = (score / 14'd7 >= 14'd7) ? 4'd7 : (score / 14'd7);
 
     // -------------------------------------------------------

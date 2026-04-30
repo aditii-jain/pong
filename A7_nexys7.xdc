@@ -68,6 +68,9 @@ set_property PACKAGE_PIN M17 [get_ports BtnR]
 set_property PACKAGE_PIN P18 [get_ports BtnD] 
 	set_property IOSTANDARD LVCMOS33 [get_ports BtnD]
 
+set_property PACKAGE_PIN J15 [get_ports SW0]
+	set_property IOSTANDARD LVCMOS33 [get_ports SW0]
+
 set_property PACKAGE_PIN A3 [get_ports {vgaR[0]}]				
 	set_property IOSTANDARD LVCMOS33 [get_ports {vgaR[0]}]
 
@@ -137,4 +140,3 @@ set_property PACKAGE_PIN F14 [get_ports acl_mosi]
 
 set_property PACKAGE_PIN E15 [get_ports acl_miso]
 	set_property IOSTANDARD LVCMOS33 [get_ports acl_miso]
-

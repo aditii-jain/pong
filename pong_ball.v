@@ -44,6 +44,7 @@ module pong_ball #(
     reg signed [10:0] next_vy;
     reg signed [10:0] step_x;
     reg signed [10:0] step_y;
+    reg signed [10:0] speed_step;
 
     wire ball_fill;
     wire paddle_hit;
@@ -100,10 +101,10 @@ module pong_ball #(
                 // x = x + vx, y = y + vy
                 next_vx = vx;
                 next_vy = vy;
-                step_x = (vx < 0) ? -$signed({7'd0, speed_level}) - 11'sd1
-                                  :  $signed({7'd0, speed_level}) + 11'sd1;
-                step_y = (vy < 0) ? -$signed({7'd0, speed_level}) - 11'sd1
-                                  :  $signed({7'd0, speed_level}) + 11'sd1;
+                // speed_level is the number of extra pixels/tick above the base speed.
+                speed_step = $signed({7'd0, speed_level}) + 11'sd1;
+                step_x = (vx < 0) ? -speed_step : speed_step;
+                step_y = (vy < 0) ? -speed_step : speed_step;
                 next_x = xpos + step_x;
                 next_y = ypos + step_y;
 
