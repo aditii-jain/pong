@@ -21,7 +21,8 @@ module pong_ball #(
     input [9:0] hCount, vCount,
     output reg [11:0] rgb,
     output reg [11:0] background,
-    output reg paddle_hit_pulse
+    output reg paddle_hit_pulse,
+    output reg miss_pulse
     );
 
     // Visible area from display_controller timing:
@@ -108,8 +109,10 @@ module pong_ball #(
             vx <= START_VX;
             vy <= START_VY;
             paddle_hit_pulse <= 1'b0;
+            miss_pulse <= 1'b0;
         end else begin
             paddle_hit_pulse <= 1'b0;
+            miss_pulse <= 1'b0;
 
             if (!enable) begin
                 xpos <= START_X;
@@ -142,7 +145,7 @@ module pong_ball #(
                     next_vy = -next_vy;
                     next_y = $signed({1'b0, V_MIN}) + BALL_HALF_SIZE;
                 end else if ((next_y + BALL_HALF_SIZE) >= $signed({1'b0, V_MAX})) begin
-                    next_vy = -next_vy;
+                    miss_pulse <= 1'b1;
                     next_y = $signed({1'b0, V_MAX}) - BALL_HALF_SIZE;
                 end
 

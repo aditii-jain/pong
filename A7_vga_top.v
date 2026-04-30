@@ -73,6 +73,7 @@ module vga_top(
     reg [5:0]   elapsed_seconds;
     reg [6:0]   elapsed_minutes;
     reg [13:0]  score;
+    reg         game_over;
     wire [3:0]  level;
     wire        ball1_active, ball2_active, ball3_active;
     wire [3:0]  ball_speed_level;
@@ -124,8 +125,13 @@ module vga_top(
     wire [11:0] background;
     wire [9:0]  paddle_left, paddle_right, paddle_top, paddle_bottom;
     wire        paddle_hit0, paddle_hit1, paddle_hit2, paddle_hit3;
+    wire        miss0, miss1, miss2, miss3;
+    wire        miss_pulse;
     wire        level_box_fill, level_label_fill, level_digit_fill;
     wire [11:0] level_rgb;
+    wire        game_over_box_fill, game_over_text_fill;
+    wire        game_over_digit_fill, game_over_colon_fill;
+    wire [11:0] game_over_rgb;
     wire [6:0]  level_segments;
     wire        level_seg_a, level_seg_b, level_seg_c, level_seg_d;
     wire        level_seg_e, level_seg_f, level_seg_g;
@@ -141,6 +147,89 @@ module vga_top(
                 4'd4: digit_to_segments = 7'b0110011;
                 default: digit_to_segments = 7'b1001111;
             endcase
+        end
+    endfunction
+
+    function block_char_fill;
+        input [7:0] ch;
+        input [9:0] x;
+        input [9:0] y;
+        input [9:0] left;
+        input [9:0] top;
+        reg [9:0] dx;
+        reg [9:0] dy;
+        begin
+            block_char_fill = 1'b0;
+            if ((x >= left) && (x < left + 10'd16) &&
+                (y >= top)  && (y < top  + 10'd24)) begin
+                dx = x - left;
+                dy = y - top;
+                case (ch)
+                    8'h41: block_char_fill = ((dy <= 10'd3) || ((dy >= 10'd10) && (dy <= 10'd13)) ||
+                                              (dx <= 10'd3) || (dx >= 10'd12)); // A
+                    8'h42: block_char_fill = ((dy <= 10'd3) || ((dy >= 10'd10) && (dy <= 10'd13)) ||
+                                              (dy >= 10'd20) || (dx <= 10'd3) ||
+                                              ((dx >= 10'd12) && (dy <= 10'd20))); // B
+                    8'h43: block_char_fill = ((dy <= 10'd3) || (dy >= 10'd20) || (dx <= 10'd3)); // C
+                    8'h45: block_char_fill = ((dy <= 10'd3) || ((dy >= 10'd10) && (dy <= 10'd13)) ||
+                                              (dy >= 10'd20) || (dx <= 10'd3)); // E
+                    8'h47: block_char_fill = ((dy <= 10'd3) || (dy >= 10'd20) || (dx <= 10'd3) ||
+                                              ((dx >= 10'd12) && (dy >= 10'd12)) ||
+                                              ((dy >= 10'd10) && (dy <= 10'd13) && (dx >= 10'd8))); // G
+                    8'h49: block_char_fill = ((dy <= 10'd3) || (dy >= 10'd20) ||
+                                              ((dx >= 10'd6) && (dx <= 10'd9))); // I
+                    8'h4C: block_char_fill = ((dx <= 10'd3) || (dy >= 10'd20)); // L
+                    8'h4D: block_char_fill = ((dx <= 10'd3) || (dx >= 10'd12) ||
+                                              ((dy <= 10'd10) && ((dx >= 10'd5 && dx <= 10'd6) ||
+                                                                  (dx >= 10'd9 && dx <= 10'd10)))); // M
+                    8'h4E: block_char_fill = ((dx <= 10'd3) || (dx >= 10'd12) ||
+                                              ((dx >= 10'd5) && (dx <= 10'd7) && (dy >= 10'd6) && (dy <= 10'd13)) ||
+                                              ((dx >= 10'd8) && (dx <= 10'd10) && (dy >= 10'd11) && (dy <= 10'd18))); // N
+                    8'h4F: block_char_fill = ((dy <= 10'd3) || (dy >= 10'd20) ||
+                                              (dx <= 10'd3) || (dx >= 10'd12)); // O
+                    8'h50: block_char_fill = ((dy <= 10'd3) || ((dy >= 10'd10) && (dy <= 10'd13)) ||
+                                              (dx <= 10'd3) || ((dx >= 10'd12) && (dy <= 10'd13))); // P
+                    8'h52: block_char_fill = ((dy <= 10'd3) || ((dy >= 10'd10) && (dy <= 10'd13)) ||
+                                              (dx <= 10'd3) || ((dx >= 10'd12) && (dy <= 10'd13)) ||
+                                              ((dx >= 10'd8) && (dy >= 10'd14))); // R
+                    8'h53: block_char_fill = ((dy <= 10'd3) || ((dy >= 10'd10) && (dy <= 10'd13)) ||
+                                              (dy >= 10'd20) || ((dx <= 10'd3) && (dy <= 10'd12)) ||
+                                              ((dx >= 10'd12) && (dy >= 10'd11))); // S
+                    8'h54: block_char_fill = ((dy <= 10'd3) || ((dx >= 10'd6) && (dx <= 10'd9))); // T
+                    8'h56: block_char_fill = (((dx <= 10'd3) || (dx >= 10'd12)) && (dy <= 10'd15)) ||
+                                              ((dx >= 10'd5) && (dx <= 10'd10) && (dy >= 10'd16)); // V
+                    8'h59: block_char_fill = (((dx <= 10'd3) || (dx >= 10'd12)) && (dy <= 10'd9)) ||
+                                              ((dx >= 10'd6) && (dx <= 10'd9) && (dy >= 10'd10)); // Y
+                    default: block_char_fill = 1'b0;
+                endcase
+            end
+        end
+    endfunction
+
+    function block_digit_fill;
+        input [3:0] digit;
+        input [9:0] x;
+        input [9:0] y;
+        input [9:0] left;
+        input [9:0] top;
+        reg [9:0] dx;
+        reg [9:0] dy;
+        reg [6:0] segs;
+        begin
+            block_digit_fill = 1'b0;
+            if ((x >= left) && (x < left + 10'd16) &&
+                (y >= top)  && (y < top  + 10'd24)) begin
+                dx = x - left;
+                dy = y - top;
+                segs = digit_to_segments(digit);
+                block_digit_fill = (segs[6] && (dy <= 10'd3) && (dx >= 10'd3) && (dx <= 10'd12)) ||
+                                   (segs[5] && (dx >= 10'd12) && (dy >= 10'd3) && (dy <= 10'd11)) ||
+                                   (segs[4] && (dx >= 10'd12) && (dy >= 10'd12) && (dy <= 10'd20)) ||
+                                   (segs[3] && (dy >= 10'd20) && (dx >= 10'd3) && (dx <= 10'd12)) ||
+                                   (segs[2] && (dx <= 10'd3) && (dy >= 10'd12) && (dy <= 10'd20)) ||
+                                   (segs[1] && (dx <= 10'd3) && (dy >= 10'd3) && (dy <= 10'd11)) ||
+                                   (segs[0] && (dy >= 10'd10) && (dy <= 10'd13) && (dx >= 10'd3) && (dx <= 10'd12));
+            end
         end
     endfunction
 
@@ -189,7 +278,7 @@ module vga_top(
         .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
-        .enable        (1'b1),
+        .enable        (!game_over),
         .speed_level   (ball_speed_level),
         .paddle_left   (paddle_left),
         .paddle_right  (paddle_right),
@@ -199,7 +288,8 @@ module vga_top(
         .vCount        (vc),
         .rgb           (ball0_rgb),
         .background    (),
-        .paddle_hit_pulse(paddle_hit0)
+        .paddle_hit_pulse(paddle_hit0),
+        .miss_pulse    (miss0)
     );
 
     pong_ball #(
@@ -213,7 +303,7 @@ module vga_top(
         .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
-        .enable        (ball1_active),
+        .enable        (ball1_active && !game_over),
         .speed_level   (ball_speed_level),
         .paddle_left   (paddle_left),
         .paddle_right  (paddle_right),
@@ -223,7 +313,8 @@ module vga_top(
         .vCount        (vc),
         .rgb           (ball1_rgb),
         .background    (),
-        .paddle_hit_pulse(paddle_hit1)
+        .paddle_hit_pulse(paddle_hit1),
+        .miss_pulse    (miss1)
     );
 
     pong_ball #(
@@ -237,7 +328,7 @@ module vga_top(
         .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
-        .enable        (ball2_active),
+        .enable        (ball2_active && !game_over),
         .speed_level   (ball_speed_level),
         .paddle_left   (paddle_left),
         .paddle_right  (paddle_right),
@@ -247,7 +338,8 @@ module vga_top(
         .vCount        (vc),
         .rgb           (ball2_rgb),
         .background    (),
-        .paddle_hit_pulse(paddle_hit2)
+        .paddle_hit_pulse(paddle_hit2),
+        .miss_pulse    (miss2)
     );
 
     pong_ball #(
@@ -261,7 +353,7 @@ module vga_top(
         .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
-        .enable        (ball3_active),
+        .enable        (ball3_active && !game_over),
         .speed_level   (ball_speed_level),
         .paddle_left   (paddle_left),
         .paddle_right  (paddle_right),
@@ -271,11 +363,12 @@ module vga_top(
         .vCount        (vc),
         .rgb           (ball3_rgb),
         .background    (),
-        .paddle_hit_pulse(paddle_hit3)
+        .paddle_hit_pulse(paddle_hit3),
+        .miss_pulse    (miss3)
     );
 
     // -------------------------------------------------------
-    // RGB priority: level overlay > balls > paddle > background
+    // RGB priority: game-over overlay > level overlay > balls > paddle > background
     // -------------------------------------------------------
     assign balls_rgb = (ball0_rgb != 12'b0000_0000_0000) ? ball0_rgb :
                        (ball1_rgb != 12'b0000_0000_0000) ? ball1_rgb :
@@ -287,7 +380,12 @@ module vga_top(
                        level_box_fill   ? 12'b1111_1111_1111 :
                        12'b0000_0000_0000;
 
-    assign rgb = (level_rgb  != 12'b0000_0000_0000) ? level_rgb  :
+    assign game_over_rgb = (game_over_text_fill || game_over_digit_fill || game_over_colon_fill) ? 12'b1111_1111_1111 :
+                           game_over_box_fill ? 12'b0000_0000_1111 :
+                           12'b0000_0000_0000;
+
+    assign rgb = (game_over_rgb != 12'b0000_0000_0000) ? game_over_rgb :
+                 (level_rgb  != 12'b0000_0000_0000) ? level_rgb  :
                  (balls_rgb  != 12'b0000_0000_0000) ? balls_rgb  :
                  (paddle_rgb != 12'b0000_0000_0000) ? paddle_rgb :
                  background;
@@ -300,6 +398,7 @@ module vga_top(
 
     assign QuadSpiFlashCS = 1'b1;
     assign paddle_hit_pulse = paddle_hit0 | paddle_hit1 | paddle_hit2 | paddle_hit3;
+    assign miss_pulse = miss0 | miss1 | miss2 | miss3;
 
     // Game timer and score
     // -------------------------------------------------------
@@ -309,8 +408,11 @@ module vga_top(
             sec_counter      <= 27'd0;
             elapsed_seconds  <= 6'd0;
             elapsed_minutes  <= 7'd0;
+            game_over        <= 1'b0;
         end else begin
-            if (sec_counter == 27'd99_999_999) begin
+            if (miss_pulse) begin
+                game_over <= 1'b1;
+            end else if (!game_over && sec_counter == 27'd99_999_999) begin
                 sec_counter <= 27'd0;
                 if (elapsed_seconds == 6'd59) begin
                     elapsed_seconds <= 6'd0;
@@ -322,7 +424,8 @@ module vga_top(
                     elapsed_seconds <= elapsed_seconds + 6'd1;
                 end
             end else begin
-                sec_counter <= sec_counter + 27'd1;
+                if (!game_over)
+                    sec_counter <= sec_counter + 27'd1;
             end
         end
     end
@@ -331,7 +434,7 @@ module vga_top(
     begin
         if (Reset) begin
             score <= 14'd0;
-        end else if (paddle_hit_pulse) begin
+        end else if (!game_over && paddle_hit_pulse) begin
             if (score == 14'd9999)
                 score <= 14'd0;
             else
@@ -345,12 +448,8 @@ module vga_top(
     assign ball2_active = (level >= 4'd3);
     assign ball3_active = (level >= 4'd4);
 
-    // Difficulty ramps with score and allows overlapping milestones.
-    // Ball speed: 0-4 => base, 5-14 => +1, 15-24 => +2, then +1 every 10 points.
-    assign ball_speed_level    = (score < 14'd5)  ? 4'd0 :
-                                 (score < 14'd15) ? 4'd1 :
-                                 (score < 14'd25) ? 4'd2 :
-                                 (score < 14'd35) ? 4'd3 : 4'd4;
+    // Keep ball speed constant for the whole game.
+    assign ball_speed_level    = 4'd0;
     assign paddle_shrink_level = (score / 14'd7 >= 14'd7) ? 4'd7 : (score / 14'd7);
 
     // -------------------------------------------------------
@@ -403,6 +502,76 @@ module vga_top(
                                (level_segments[2] && level_seg_e) ||
                                (level_segments[1] && level_seg_f) ||
                                (level_segments[0] && level_seg_g));
+
+    // -------------------------------------------------------
+    // Game-over VGA display
+    // -------------------------------------------------------
+    assign game_over_box_fill = game_over && bright &&
+                                (hc >= 10'd220) && (hc <= 10'd560) &&
+                                (vc >= 10'd175) && (vc <= 10'd380);
+
+    assign game_over_text_fill = game_over && bright &&
+                                 (
+                                  // GAME OVER
+                                  block_char_fill(8'h47, hc, vc, 10'd250, 10'd200) ||
+                                  block_char_fill(8'h41, hc, vc, 10'd268, 10'd200) ||
+                                  block_char_fill(8'h4D, hc, vc, 10'd286, 10'd200) ||
+                                  block_char_fill(8'h45, hc, vc, 10'd304, 10'd200) ||
+                                  block_char_fill(8'h4F, hc, vc, 10'd340, 10'd200) ||
+                                  block_char_fill(8'h56, hc, vc, 10'd358, 10'd200) ||
+                                  block_char_fill(8'h45, hc, vc, 10'd376, 10'd200) ||
+                                  block_char_fill(8'h52, hc, vc, 10'd394, 10'd200) ||
+                                  // SCORE
+                                  block_char_fill(8'h53, hc, vc, 10'd250, 10'd245) ||
+                                  block_char_fill(8'h43, hc, vc, 10'd268, 10'd245) ||
+                                  block_char_fill(8'h4F, hc, vc, 10'd286, 10'd245) ||
+                                  block_char_fill(8'h52, hc, vc, 10'd304, 10'd245) ||
+                                  block_char_fill(8'h45, hc, vc, 10'd322, 10'd245) ||
+                                  // TIME
+                                  block_char_fill(8'h54, hc, vc, 10'd250, 10'd285) ||
+                                  block_char_fill(8'h49, hc, vc, 10'd268, 10'd285) ||
+                                  block_char_fill(8'h4D, hc, vc, 10'd286, 10'd285) ||
+                                  block_char_fill(8'h45, hc, vc, 10'd304, 10'd285) ||
+                                  // PRESS BTN C
+                                  block_char_fill(8'h50, hc, vc, 10'd250, 10'd320) ||
+                                  block_char_fill(8'h52, hc, vc, 10'd268, 10'd320) ||
+                                  block_char_fill(8'h45, hc, vc, 10'd286, 10'd320) ||
+                                  block_char_fill(8'h53, hc, vc, 10'd304, 10'd320) ||
+                                  block_char_fill(8'h53, hc, vc, 10'd322, 10'd320) ||
+                                  block_char_fill(8'h42, hc, vc, 10'd358, 10'd320) ||
+                                  block_char_fill(8'h54, hc, vc, 10'd376, 10'd320) ||
+                                  block_char_fill(8'h4E, hc, vc, 10'd394, 10'd320) ||
+                                  block_char_fill(8'h43, hc, vc, 10'd430, 10'd320) ||
+                                  // TO PLAY AGAIN
+                                  block_char_fill(8'h54, hc, vc, 10'd250, 10'd350) ||
+                                  block_char_fill(8'h4F, hc, vc, 10'd268, 10'd350) ||
+                                  block_char_fill(8'h50, hc, vc, 10'd304, 10'd350) ||
+                                  block_char_fill(8'h4C, hc, vc, 10'd322, 10'd350) ||
+                                  block_char_fill(8'h41, hc, vc, 10'd340, 10'd350) ||
+                                  block_char_fill(8'h59, hc, vc, 10'd358, 10'd350) ||
+                                  block_char_fill(8'h41, hc, vc, 10'd394, 10'd350) ||
+                                  block_char_fill(8'h47, hc, vc, 10'd412, 10'd350) ||
+                                  block_char_fill(8'h41, hc, vc, 10'd430, 10'd350) ||
+                                  block_char_fill(8'h49, hc, vc, 10'd448, 10'd350) ||
+                                  block_char_fill(8'h4E, hc, vc, 10'd466, 10'd350)
+                                 );
+
+    assign game_over_digit_fill = game_over && bright &&
+                                  (
+                                   block_digit_fill(score / 14'd1000,       hc, vc, 10'd360, 10'd245) ||
+                                   block_digit_fill((score / 14'd100) % 10, hc, vc, 10'd378, 10'd245) ||
+                                   block_digit_fill((score / 14'd10) % 10,  hc, vc, 10'd396, 10'd245) ||
+                                   block_digit_fill(score % 10,             hc, vc, 10'd414, 10'd245) ||
+                                   block_digit_fill(elapsed_minutes / 10,   hc, vc, 10'd360, 10'd285) ||
+                                   block_digit_fill(elapsed_minutes % 10,   hc, vc, 10'd378, 10'd285) ||
+                                   block_digit_fill(elapsed_seconds / 10,   hc, vc, 10'd408, 10'd285) ||
+                                   block_digit_fill(elapsed_seconds % 10,   hc, vc, 10'd426, 10'd285)
+                                  );
+
+    assign game_over_colon_fill = game_over && bright &&
+                                  (hc >= 10'd399) && (hc <= 10'd402) &&
+                                  (((vc >= 10'd292) && (vc <= 10'd295)) ||
+                                   ((vc >= 10'd305) && (vc <= 10'd308)));
 
     // -------------------------------------------------------
     // Seven-segment display
