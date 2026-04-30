@@ -74,6 +74,7 @@ module vga_top(
     reg [6:0]   elapsed_minutes;
     reg [13:0]  score;
     reg         game_over;
+    reg [27:0]  game_over_counter;
     wire [3:0]  level;
     wire        ball1_active, ball2_active, ball3_active;
     wire [3:0]  ball_speed_level;
@@ -129,6 +130,8 @@ module vga_top(
     wire        miss_pulse;
     wire        level_box_fill, level_label_fill, level_digit_fill;
     wire [11:0] level_rgb;
+    wire        game_over_title_fill;
+    wire        game_over_title_phase, game_over_panel_phase;
     wire        game_over_box_fill, game_over_text_fill;
     wire        game_over_digit_fill, game_over_colon_fill;
     wire [11:0] game_over_rgb;
@@ -145,7 +148,12 @@ module vga_top(
                 4'd2: digit_to_segments = 7'b1101101;
                 4'd3: digit_to_segments = 7'b1111001;
                 4'd4: digit_to_segments = 7'b0110011;
-                default: digit_to_segments = 7'b1001111;
+                4'd5: digit_to_segments = 7'b1011011;
+                4'd6: digit_to_segments = 7'b1011111;
+                4'd7: digit_to_segments = 7'b1110000;
+                4'd8: digit_to_segments = 7'b1111111;
+                4'd9: digit_to_segments = 7'b1111011;
+                default: digit_to_segments = 7'b0000001;
             endcase
         end
     endfunction
@@ -202,6 +210,52 @@ module vga_top(
                                               ((dx >= 10'd6) && (dx <= 10'd9) && (dy >= 10'd10)); // Y
                     default: block_char_fill = 1'b0;
                 endcase
+            end
+        end
+    endfunction
+
+    function big_char_fill;
+        input [7:0] ch;
+        input [9:0] x;
+        input [9:0] y;
+        input [9:0] left;
+        input [9:0] top;
+        reg [9:0] dx;
+        reg [9:0] dy;
+        reg [9:0] sx;
+        reg [9:0] sy;
+        begin
+            big_char_fill = 1'b0;
+            if ((x >= left) && (x < left + 10'd32) &&
+                (y >= top)  && (y < top  + 10'd48)) begin
+                dx = x - left;
+                dy = y - top;
+                sx = dx >> 1;
+                sy = dy >> 1;
+                big_char_fill = block_char_fill(ch, sx, sy, 10'd0, 10'd0);
+            end
+        end
+    endfunction
+
+    function small_char_fill;
+        input [7:0] ch;
+        input [9:0] x;
+        input [9:0] y;
+        input [9:0] left;
+        input [9:0] top;
+        reg [9:0] dx;
+        reg [9:0] dy;
+        reg [9:0] sx;
+        reg [9:0] sy;
+        begin
+            small_char_fill = 1'b0;
+            if ((x >= left) && (x < left + 10'd8) &&
+                (y >= top)  && (y < top  + 10'd12)) begin
+                dx = x - left;
+                dy = y - top;
+                sx = dx << 1;
+                sy = dy << 1;
+                small_char_fill = block_char_fill(ch, sx, sy, 10'd0, 10'd0);
             end
         end
     endfunction
@@ -380,7 +434,8 @@ module vga_top(
                        level_box_fill   ? 12'b1111_1111_1111 :
                        12'b0000_0000_0000;
 
-    assign game_over_rgb = (game_over_text_fill || game_over_digit_fill || game_over_colon_fill) ? 12'b1111_1111_1111 :
+    assign game_over_rgb = game_over_title_fill ? 12'b1111_0000_0000 :
+                           (game_over_text_fill || game_over_digit_fill || game_over_colon_fill) ? 12'b1111_1111_1111 :
                            game_over_box_fill ? 12'b0000_0000_1111 :
                            12'b0000_0000_0000;
 
@@ -409,9 +464,11 @@ module vga_top(
             elapsed_seconds  <= 6'd0;
             elapsed_minutes  <= 7'd0;
             game_over        <= 1'b0;
+            game_over_counter <= 28'd0;
         end else begin
             if (miss_pulse) begin
-                game_over <= 1'b1;
+                game_over         <= 1'b1;
+                game_over_counter <= 28'd0;
             end else if (!game_over && sec_counter == 27'd99_999_999) begin
                 sec_counter <= 27'd0;
                 if (elapsed_seconds == 6'd59) begin
@@ -424,8 +481,11 @@ module vga_top(
                     elapsed_seconds <= elapsed_seconds + 6'd1;
                 end
             end else begin
-                if (!game_over)
+                if (!game_over) begin
                     sec_counter <= sec_counter + 27'd1;
+                end else if (game_over_counter < 28'd199_999_999) begin
+                    game_over_counter <= game_over_counter + 28'd1;
+                end
             end
         end
     end
@@ -506,72 +566,77 @@ module vga_top(
     // -------------------------------------------------------
     // Game-over VGA display
     // -------------------------------------------------------
-    assign game_over_box_fill = game_over && bright &&
-                                (hc >= 10'd220) && (hc <= 10'd560) &&
-                                (vc >= 10'd175) && (vc <= 10'd380);
+    assign game_over_title_phase = game_over && (game_over_counter < 28'd199_999_999);
+    assign game_over_panel_phase = game_over && !game_over_title_phase;
 
-    assign game_over_text_fill = game_over && bright &&
-                                 (
-                                  // GAME OVER
-                                  block_char_fill(8'h47, hc, vc, 10'd250, 10'd200) ||
-                                  block_char_fill(8'h41, hc, vc, 10'd268, 10'd200) ||
-                                  block_char_fill(8'h4D, hc, vc, 10'd286, 10'd200) ||
-                                  block_char_fill(8'h45, hc, vc, 10'd304, 10'd200) ||
-                                  block_char_fill(8'h4F, hc, vc, 10'd340, 10'd200) ||
-                                  block_char_fill(8'h56, hc, vc, 10'd358, 10'd200) ||
-                                  block_char_fill(8'h45, hc, vc, 10'd376, 10'd200) ||
-                                  block_char_fill(8'h52, hc, vc, 10'd394, 10'd200) ||
-                                  // SCORE
-                                  block_char_fill(8'h53, hc, vc, 10'd250, 10'd245) ||
-                                  block_char_fill(8'h43, hc, vc, 10'd268, 10'd245) ||
-                                  block_char_fill(8'h4F, hc, vc, 10'd286, 10'd245) ||
-                                  block_char_fill(8'h52, hc, vc, 10'd304, 10'd245) ||
-                                  block_char_fill(8'h45, hc, vc, 10'd322, 10'd245) ||
-                                  // TIME
-                                  block_char_fill(8'h54, hc, vc, 10'd250, 10'd285) ||
-                                  block_char_fill(8'h49, hc, vc, 10'd268, 10'd285) ||
-                                  block_char_fill(8'h4D, hc, vc, 10'd286, 10'd285) ||
-                                  block_char_fill(8'h45, hc, vc, 10'd304, 10'd285) ||
-                                  // PRESS BTN C
-                                  block_char_fill(8'h50, hc, vc, 10'd250, 10'd320) ||
-                                  block_char_fill(8'h52, hc, vc, 10'd268, 10'd320) ||
-                                  block_char_fill(8'h45, hc, vc, 10'd286, 10'd320) ||
-                                  block_char_fill(8'h53, hc, vc, 10'd304, 10'd320) ||
-                                  block_char_fill(8'h53, hc, vc, 10'd322, 10'd320) ||
-                                  block_char_fill(8'h42, hc, vc, 10'd358, 10'd320) ||
-                                  block_char_fill(8'h54, hc, vc, 10'd376, 10'd320) ||
-                                  block_char_fill(8'h4E, hc, vc, 10'd394, 10'd320) ||
-                                  block_char_fill(8'h43, hc, vc, 10'd430, 10'd320) ||
-                                  // TO PLAY AGAIN
-                                  block_char_fill(8'h54, hc, vc, 10'd250, 10'd350) ||
-                                  block_char_fill(8'h4F, hc, vc, 10'd268, 10'd350) ||
-                                  block_char_fill(8'h50, hc, vc, 10'd304, 10'd350) ||
-                                  block_char_fill(8'h4C, hc, vc, 10'd322, 10'd350) ||
-                                  block_char_fill(8'h41, hc, vc, 10'd340, 10'd350) ||
-                                  block_char_fill(8'h59, hc, vc, 10'd358, 10'd350) ||
-                                  block_char_fill(8'h41, hc, vc, 10'd394, 10'd350) ||
-                                  block_char_fill(8'h47, hc, vc, 10'd412, 10'd350) ||
-                                  block_char_fill(8'h41, hc, vc, 10'd430, 10'd350) ||
-                                  block_char_fill(8'h49, hc, vc, 10'd448, 10'd350) ||
-                                  block_char_fill(8'h4E, hc, vc, 10'd466, 10'd350)
-                                 );
-
-    assign game_over_digit_fill = game_over && bright &&
+    assign game_over_title_fill = game_over_title_phase && bright &&
                                   (
-                                   block_digit_fill(score / 14'd1000,       hc, vc, 10'd360, 10'd245) ||
-                                   block_digit_fill((score / 14'd100) % 10, hc, vc, 10'd378, 10'd245) ||
-                                   block_digit_fill((score / 14'd10) % 10,  hc, vc, 10'd396, 10'd245) ||
-                                   block_digit_fill(score % 10,             hc, vc, 10'd414, 10'd245) ||
-                                   block_digit_fill(elapsed_minutes / 10,   hc, vc, 10'd360, 10'd285) ||
-                                   block_digit_fill(elapsed_minutes % 10,   hc, vc, 10'd378, 10'd285) ||
-                                   block_digit_fill(elapsed_seconds / 10,   hc, vc, 10'd408, 10'd285) ||
-                                   block_digit_fill(elapsed_seconds % 10,   hc, vc, 10'd426, 10'd285)
+                                   big_char_fill(8'h47, hc, vc, 10'd310, 10'd228) ||
+                                   big_char_fill(8'h41, hc, vc, 10'd346, 10'd228) ||
+                                   big_char_fill(8'h4D, hc, vc, 10'd382, 10'd228) ||
+                                   big_char_fill(8'h45, hc, vc, 10'd418, 10'd228) ||
+                                   big_char_fill(8'h4F, hc, vc, 10'd310, 10'd282) ||
+                                   big_char_fill(8'h56, hc, vc, 10'd346, 10'd282) ||
+                                   big_char_fill(8'h45, hc, vc, 10'd382, 10'd282) ||
+                                   big_char_fill(8'h52, hc, vc, 10'd418, 10'd282)
                                   );
 
-    assign game_over_colon_fill = game_over && bright &&
-                                  (hc >= 10'd399) && (hc <= 10'd402) &&
-                                  (((vc >= 10'd292) && (vc <= 10'd295)) ||
-                                   ((vc >= 10'd305) && (vc <= 10'd308)));
+    assign game_over_box_fill = game_over_panel_phase && bright &&
+                                (hc >= 10'd235) && (hc <= 10'd692) &&
+                                (vc >= 10'd205) && (vc <= 10'd350);
+
+    assign game_over_text_fill = game_over_panel_phase && bright &&
+                                 (
+                                  // SCORE
+                                  block_char_fill(8'h53, hc, vc, 10'd315, 10'd230) ||
+                                  block_char_fill(8'h43, hc, vc, 10'd333, 10'd230) ||
+                                  block_char_fill(8'h4F, hc, vc, 10'd351, 10'd230) ||
+                                  block_char_fill(8'h52, hc, vc, 10'd369, 10'd230) ||
+                                  block_char_fill(8'h45, hc, vc, 10'd387, 10'd230) ||
+                                  // TIME
+                                  block_char_fill(8'h54, hc, vc, 10'd315, 10'd270) ||
+                                  block_char_fill(8'h49, hc, vc, 10'd333, 10'd270) ||
+                                  block_char_fill(8'h4D, hc, vc, 10'd351, 10'd270) ||
+                                  block_char_fill(8'h45, hc, vc, 10'd369, 10'd270) ||
+                                  // PRESS BTN C TO PLAY AGAIN
+                                  small_char_fill(8'h50, hc, vc, 10'd345, 10'd325) ||
+                                  small_char_fill(8'h52, hc, vc, 10'd354, 10'd325) ||
+                                  small_char_fill(8'h45, hc, vc, 10'd363, 10'd325) ||
+                                  small_char_fill(8'h53, hc, vc, 10'd372, 10'd325) ||
+                                  small_char_fill(8'h53, hc, vc, 10'd381, 10'd325) ||
+                                  small_char_fill(8'h42, hc, vc, 10'd399, 10'd325) ||
+                                  small_char_fill(8'h54, hc, vc, 10'd408, 10'd325) ||
+                                  small_char_fill(8'h4E, hc, vc, 10'd417, 10'd325) ||
+                                  small_char_fill(8'h43, hc, vc, 10'd435, 10'd325) ||
+                                  small_char_fill(8'h54, hc, vc, 10'd453, 10'd325) ||
+                                  small_char_fill(8'h4F, hc, vc, 10'd462, 10'd325) ||
+                                  small_char_fill(8'h50, hc, vc, 10'd480, 10'd325) ||
+                                  small_char_fill(8'h4C, hc, vc, 10'd489, 10'd325) ||
+                                  small_char_fill(8'h41, hc, vc, 10'd498, 10'd325) ||
+                                  small_char_fill(8'h59, hc, vc, 10'd507, 10'd325) ||
+                                  small_char_fill(8'h41, hc, vc, 10'd525, 10'd325) ||
+                                  small_char_fill(8'h47, hc, vc, 10'd534, 10'd325) ||
+                                  small_char_fill(8'h41, hc, vc, 10'd543, 10'd325) ||
+                                  small_char_fill(8'h49, hc, vc, 10'd552, 10'd325) ||
+                                  small_char_fill(8'h4E, hc, vc, 10'd561, 10'd325)
+                                 );
+
+    assign game_over_digit_fill = game_over_panel_phase && bright &&
+                                  (
+                                   block_digit_fill(score / 14'd1000,       hc, vc, 10'd450, 10'd230) ||
+                                   block_digit_fill((score / 14'd100) % 10, hc, vc, 10'd468, 10'd230) ||
+                                   block_digit_fill((score / 14'd10) % 10,  hc, vc, 10'd486, 10'd230) ||
+                                   block_digit_fill(score % 10,             hc, vc, 10'd504, 10'd230) ||
+                                   block_digit_fill(elapsed_minutes / 10,   hc, vc, 10'd450, 10'd270) ||
+                                   block_digit_fill(elapsed_minutes % 10,   hc, vc, 10'd468, 10'd270) ||
+                                   block_digit_fill(elapsed_seconds / 10,   hc, vc, 10'd498, 10'd270) ||
+                                   block_digit_fill(elapsed_seconds % 10,   hc, vc, 10'd516, 10'd270)
+                                  );
+
+    assign game_over_colon_fill = game_over_panel_phase && bright &&
+                                  (hc >= 10'd489) && (hc <= 10'd492) &&
+                                  (((vc >= 10'd277) && (vc <= 10'd280)) ||
+                                   ((vc >= 10'd290) && (vc <= 10'd293)));
 
     // -------------------------------------------------------
     // Seven-segment display
