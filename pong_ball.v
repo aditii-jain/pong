@@ -4,6 +4,7 @@ module pong_ball(
     input clk, // slow movement clock, similar to block_controller
     input bright,
     input rst,
+    input [3:0] speed_level,
     // Paddle bounding box (for collision handling)
     input [9:0] paddle_left,
     input [9:0] paddle_right,
@@ -11,7 +12,8 @@ module pong_ball(
     input [9:0] paddle_bottom,
     input [9:0] hCount, vCount,
     output reg [11:0] rgb,
-    output reg [11:0] background
+    output reg [11:0] background,
+    output reg paddle_hit_pulse
     );
 
     // Visible area from display_controller timing:
@@ -34,6 +36,8 @@ module pong_ball(
     reg signed [10:0] next_y;
     reg signed [10:0] next_vx;
     reg signed [10:0] next_vy;
+    reg signed [10:0] step_x;
+    reg signed [10:0] step_y;
 
     wire ball_fill;
     wire paddle_hit;
@@ -77,14 +81,20 @@ module pong_ball(
             ypos <= 11'sd275;
             vx <= 11'sd1;
             vy <= -11'sd1;
+            paddle_hit_pulse <= 1'b0;
         end else begin
+            paddle_hit_pulse <= 1'b0;
 
             // Per-frame update model:
             // x = x + vx, y = y + vy
             next_vx = vx;
             next_vy = vy;
-            next_x = xpos + next_vx;
-            next_y = ypos + next_vy;
+            step_x = (vx < 0) ? -$signed({7'd0, speed_level}) - 11'sd1
+                              :  $signed({7'd0, speed_level}) + 11'sd1;
+            step_y = (vy < 0) ? -$signed({7'd0, speed_level}) - 11'sd1
+                              :  $signed({7'd0, speed_level}) + 11'sd1;
+            next_x = xpos + step_x;
+            next_y = ypos + step_y;
 
             // Left/right wall bounce: flip only vx
             if ((next_x - BALL_HALF_SIZE) <= $signed({1'b0, H_MIN})) begin
@@ -108,6 +118,7 @@ module pong_ball(
             if (paddle_hit) begin
                 next_vy = -next_vy;
                 next_y = $signed({1'b0, paddle_top}) - BALL_HALF_SIZE - 11'sd1;
+                paddle_hit_pulse <= 1'b1;
             end
 
             xpos <= next_x;

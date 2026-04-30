@@ -61,9 +61,18 @@ module vga_top(
     wire [11:0] paddle_rgb;
 
     reg [3:0]   SSD;
-    wire [3:0]  SSD3, SSD2, SSD1, SSD0;
+    reg         SSD_DP;
+    wire [3:0]  SSD7, SSD6, SSD5, SSD4, SSD3, SSD2, SSD1, SSD0;
     reg [7:0]   SSD_CATHODES;
-    wire [1:0]  ssdscan_clk;
+    wire [2:0]  ssdscan_clk;
+    wire        paddle_hit_pulse;
+
+    reg [26:0]  sec_counter;
+    reg [5:0]   elapsed_seconds;
+    reg [6:0]   elapsed_minutes;
+    reg [13:0]  score;
+    wire [3:0]  ball_speed_level;
+    wire [3:0]  paddle_shrink_level;
 
     // -------------------------------------------------------
     // Clock divider
@@ -129,6 +138,7 @@ module vga_top(
         .bright        (bright),
         .rst           (BtnC),
         .accel_x       (accel_x_data),
+        .shrink_level  (paddle_shrink_level),
         .hCount        (hc),
         .vCount        (vc),
         .paddle_left   (paddle_left),
@@ -146,6 +156,7 @@ module vga_top(
         .clk           (move_clk),
         .bright        (bright),
         .rst           (BtnC),
+        .speed_level   (ball_speed_level),
         .paddle_left   (paddle_left),
         .paddle_right  (paddle_right),
         .paddle_top    (paddle_top),
@@ -153,7 +164,8 @@ module vga_top(
         .hCount        (hc),
         .vCount        (vc),
         .rgb           (ball_rgb),
-        .background    (ball_background)
+        .background    (ball_background),
+        .paddle_hit_pulse(paddle_hit_pulse)
     );
 
     // -------------------------------------------------------
@@ -171,28 +183,84 @@ module vga_top(
 
     assign QuadSpiFlashCS = 1'b1;
 
+    // Game timer and score
     // -------------------------------------------------------
-    // Seven-segment display (available for score/time)
+    always @(posedge ClkPort, posedge Reset)
+    begin
+        if (Reset) begin
+            sec_counter      <= 27'd0;
+            elapsed_seconds  <= 6'd0;
+            elapsed_minutes  <= 7'd0;
+        end else begin
+            if (sec_counter == 27'd99_999_999) begin
+                sec_counter <= 27'd0;
+                if (elapsed_seconds == 6'd59) begin
+                    elapsed_seconds <= 6'd0;
+                    if (elapsed_minutes == 7'd99)
+                        elapsed_minutes <= 7'd0;
+                    else
+                        elapsed_minutes <= elapsed_minutes + 7'd1;
+                end else begin
+                    elapsed_seconds <= elapsed_seconds + 6'd1;
+                end
+            end else begin
+                sec_counter <= sec_counter + 27'd1;
+            end
+        end
+    end
+
+    always @(posedge move_clk, posedge Reset)
+    begin
+        if (Reset) begin
+            score <= 14'd0;
+        end else if (paddle_hit_pulse) begin
+            if (score == 14'd9999)
+                score <= 14'd0;
+            else
+                score <= score + 14'd1;
+        end
+    end
+
+    // Difficulty ramps with score and allows overlapping milestones.
+    assign ball_speed_level    = (score / 14'd5 >= 14'd4) ? 4'd4 : (score / 14'd5);
+    assign paddle_shrink_level = (score / 14'd7 >= 14'd7) ? 4'd7 : (score / 14'd7);
+
     // -------------------------------------------------------
-    assign SSD3 = 4'b0000;
-    assign SSD2 = 4'b0000;
-    assign SSD1 = 4'b0000;
-    assign SSD0 = 4'b0000;
+    // Seven-segment display
+    // Upper 4 SSDs: MM:SS elapsed time
+    // Lower 4 SSDs: paddle-hit score
+    // -------------------------------------------------------
+    assign SSD7 = elapsed_minutes / 10;
+    assign SSD6 = elapsed_minutes % 10;
+    assign SSD5 = elapsed_seconds / 10;
+    assign SSD4 = elapsed_seconds % 10;
 
-    assign ssdscan_clk = DIV_CLK[19:18];
-    assign An0 = !(~ssdscan_clk[1] && ~ssdscan_clk[0]);
-    assign An1 = !(~ssdscan_clk[1] &&  ssdscan_clk[0]);
-    assign An2 =  !(ssdscan_clk[1] && ~ssdscan_clk[0]);
-    assign An3 =  !(ssdscan_clk[1] &&  ssdscan_clk[0]);
-    assign {An7, An6, An5, An4} = 4'b1111;
+    assign SSD3 = score / 1000;
+    assign SSD2 = (score / 100) % 10;
+    assign SSD1 = (score / 10) % 10;
+    assign SSD0 = score % 10;
 
-    always @ (ssdscan_clk, SSD0, SSD1, SSD2, SSD3)
+    assign ssdscan_clk = DIV_CLK[19:17];
+    assign An0 = ~(ssdscan_clk == 3'b000);
+    assign An1 = ~(ssdscan_clk == 3'b001);
+    assign An2 = ~(ssdscan_clk == 3'b010);
+    assign An3 = ~(ssdscan_clk == 3'b011);
+    assign An4 = ~(ssdscan_clk == 3'b100);
+    assign An5 = ~(ssdscan_clk == 3'b101);
+    assign An6 = ~(ssdscan_clk == 3'b110);
+    assign An7 = ~(ssdscan_clk == 3'b111);
+
+    always @ (ssdscan_clk, SSD0, SSD1, SSD2, SSD3, SSD4, SSD5, SSD6, SSD7)
     begin : SSD_SCAN_OUT
         case (ssdscan_clk)
-            2'b00: SSD = SSD0;
-            2'b01: SSD = SSD1;
-            2'b10: SSD = SSD2;
-            2'b11: SSD = SSD3;
+            3'b000: begin SSD = SSD0; SSD_DP = 1'b1; end
+            3'b001: begin SSD = SSD1; SSD_DP = 1'b1; end
+            3'b010: begin SSD = SSD2; SSD_DP = 1'b1; end
+            3'b011: begin SSD = SSD3; SSD_DP = 1'b1; end
+            3'b100: begin SSD = SSD4; SSD_DP = 1'b1; end
+            3'b101: begin SSD = SSD5; SSD_DP = 1'b1; end
+            3'b110: begin SSD = SSD6; SSD_DP = 1'b0; end
+            3'b111: begin SSD = SSD7; SSD_DP = 1'b1; end
         endcase
     end
 
@@ -219,6 +287,7 @@ module vga_top(
         endcase
     end
 
-    assign {Ca, Cb, Cc, Cd, Ce, Cf, Cg, Dp} = SSD_CATHODES;
+    assign {Ca, Cb, Cc, Cd, Ce, Cf, Cg} = SSD_CATHODES[7:1];
+    assign Dp = SSD_DP;
 
 endmodule
