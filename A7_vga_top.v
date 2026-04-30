@@ -57,7 +57,8 @@ module vga_top(
     wire bright;
     wire [9:0] hc, vc;
     wire [11:0] rgb;
-    wire [11:0] ball_rgb;
+    wire [11:0] ball0_rgb, ball1_rgb, ball2_rgb, ball3_rgb;
+    wire [11:0] balls_rgb;
     wire [11:0] paddle_rgb;
 
     reg [3:0]   SSD;
@@ -71,6 +72,8 @@ module vga_top(
     reg [5:0]   elapsed_seconds;
     reg [6:0]   elapsed_minutes;
     reg [13:0]  score;
+    wire [3:0]  level;
+    wire        ball1_active, ball2_active, ball3_active;
     wire [3:0]  ball_speed_level;
     wire [3:0]  paddle_shrink_level;
 
@@ -118,8 +121,27 @@ module vga_top(
     // VGA display controller
     // -------------------------------------------------------
     wire [11:0] background;
-    wire [11:0] ball_background;
     wire [9:0]  paddle_left, paddle_right, paddle_top, paddle_bottom;
+    wire        paddle_hit0, paddle_hit1, paddle_hit2, paddle_hit3;
+    wire        level_box_fill, level_digit_fill;
+    wire [11:0] level_rgb;
+    wire [6:0]  level_segments;
+    wire        level_seg_a, level_seg_b, level_seg_c, level_seg_d;
+    wire        level_seg_e, level_seg_f, level_seg_g;
+
+    function [6:0] digit_to_segments;
+        input [3:0] digit;
+        begin
+            case (digit)
+                4'd0: digit_to_segments = 7'b1111110;
+                4'd1: digit_to_segments = 7'b0110000;
+                4'd2: digit_to_segments = 7'b1101101;
+                4'd3: digit_to_segments = 7'b1111001;
+                4'd4: digit_to_segments = 7'b0110011;
+                default: digit_to_segments = 7'b1001111;
+            endcase
+        end
+    endfunction
 
     display_controller dc(
         .clk    (ClkPort),
@@ -150,12 +172,19 @@ module vga_top(
     );
 
     // -------------------------------------------------------
-    // Ball
+    // Balls: add one at each 10-point level, up to 4 total.
     // -------------------------------------------------------
-    pong_ball ball_ctrl(
+    pong_ball #(
+        .BALL_COLOR(12'b1111_0000_0000),
+        .START_X(11'sd464),
+        .START_Y(11'sd275),
+        .START_VX(11'sd1),
+        .START_VY(-11'sd1)
+    ) ball0_ctrl(
         .clk           (move_clk),
         .bright        (bright),
         .rst           (BtnC),
+        .enable        (1'b1),
         .speed_level   (ball_speed_level),
         .paddle_left   (paddle_left),
         .paddle_right  (paddle_right),
@@ -163,25 +192,106 @@ module vga_top(
         .paddle_bottom (paddle_bottom),
         .hCount        (hc),
         .vCount        (vc),
-        .rgb           (ball_rgb),
-        .background    (ball_background),
-        .paddle_hit_pulse(paddle_hit_pulse)
+        .rgb           (ball0_rgb),
+        .background    (),
+        .paddle_hit_pulse(paddle_hit0)
+    );
+
+    pong_ball #(
+        .BALL_COLOR(12'b0000_1111_0000),
+        .START_X(11'sd300),
+        .START_Y(11'sd170),
+        .START_VX(-11'sd1),
+        .START_VY(11'sd1)
+    ) ball1_ctrl(
+        .clk           (move_clk),
+        .bright        (bright),
+        .rst           (BtnC),
+        .enable        (ball1_active),
+        .speed_level   (ball_speed_level),
+        .paddle_left   (paddle_left),
+        .paddle_right  (paddle_right),
+        .paddle_top    (paddle_top),
+        .paddle_bottom (paddle_bottom),
+        .hCount        (hc),
+        .vCount        (vc),
+        .rgb           (ball1_rgb),
+        .background    (),
+        .paddle_hit_pulse(paddle_hit1)
+    );
+
+    pong_ball #(
+        .BALL_COLOR(12'b0000_0000_1111),
+        .START_X(11'sd620),
+        .START_Y(11'sd210),
+        .START_VX(11'sd1),
+        .START_VY(11'sd1)
+    ) ball2_ctrl(
+        .clk           (move_clk),
+        .bright        (bright),
+        .rst           (BtnC),
+        .enable        (ball2_active),
+        .speed_level   (ball_speed_level),
+        .paddle_left   (paddle_left),
+        .paddle_right  (paddle_right),
+        .paddle_top    (paddle_top),
+        .paddle_bottom (paddle_bottom),
+        .hCount        (hc),
+        .vCount        (vc),
+        .rgb           (ball2_rgb),
+        .background    (),
+        .paddle_hit_pulse(paddle_hit2)
+    );
+
+    pong_ball #(
+        .BALL_COLOR(12'b1111_1111_0000),
+        .START_X(11'sd400),
+        .START_Y(11'sd390),
+        .START_VX(-11'sd1),
+        .START_VY(-11'sd1)
+    ) ball3_ctrl(
+        .clk           (move_clk),
+        .bright        (bright),
+        .rst           (BtnC),
+        .enable        (ball3_active),
+        .speed_level   (ball_speed_level),
+        .paddle_left   (paddle_left),
+        .paddle_right  (paddle_right),
+        .paddle_top    (paddle_top),
+        .paddle_bottom (paddle_bottom),
+        .hCount        (hc),
+        .vCount        (vc),
+        .rgb           (ball3_rgb),
+        .background    (),
+        .paddle_hit_pulse(paddle_hit3)
     );
 
     // -------------------------------------------------------
-    // RGB priority: ball > paddle > background
+    // RGB priority: level overlay > balls > paddle > background
     // -------------------------------------------------------
-    assign rgb = (ball_rgb   != 12'b0000_0000_0000) ? ball_rgb   :
-                 (paddle_rgb != 12'b0000_0000_0000) ? paddle_rgb :
-                 ball_background;
+    assign balls_rgb = (ball0_rgb != 12'b0000_0000_0000) ? ball0_rgb :
+                       (ball1_rgb != 12'b0000_0000_0000) ? ball1_rgb :
+                       (ball2_rgb != 12'b0000_0000_0000) ? ball2_rgb :
+                       (ball3_rgb != 12'b0000_0000_0000) ? ball3_rgb :
+                       12'b0000_0000_0000;
 
-    assign background = ball_background;
+    assign level_rgb = level_digit_fill ? 12'b0000_1111_1111 :
+                       level_box_fill   ? 12'b1111_1111_1111 :
+                       12'b0000_0000_0000;
+
+    assign rgb = (level_rgb  != 12'b0000_0000_0000) ? level_rgb  :
+                 (balls_rgb  != 12'b0000_0000_0000) ? balls_rgb  :
+                 (paddle_rgb != 12'b0000_0000_0000) ? paddle_rgb :
+                 background;
+
+    assign background = 12'b0000_0000_0000;
 
     assign vgaR = rgb[11:8];
     assign vgaG = rgb[7:4];
     assign vgaB = rgb[3:0];
 
     assign QuadSpiFlashCS = 1'b1;
+    assign paddle_hit_pulse = paddle_hit0 | paddle_hit1 | paddle_hit2 | paddle_hit3;
 
     // Game timer and score
     // -------------------------------------------------------
@@ -221,9 +331,42 @@ module vga_top(
         end
     end
 
+    // Level 1 starts at score 10. New balls spawn at levels 1, 2, and 3.
+    assign level        = ((score / 14'd10) >= 14'd4) ? 4'd4 : (score / 14'd10);
+    assign ball1_active = (level >= 4'd1);
+    assign ball2_active = (level >= 4'd2);
+    assign ball3_active = (level >= 4'd3);
+
     // Difficulty ramps with score and allows overlapping milestones.
     assign ball_speed_level    = (score / 14'd5 >= 14'd4) ? 4'd4 : (score / 14'd5);
     assign paddle_shrink_level = (score / 14'd7 >= 14'd7) ? 4'd7 : (score / 14'd7);
+
+    // -------------------------------------------------------
+    // VGA level display: boxed seven-segment digit in top-right
+    // -------------------------------------------------------
+    assign level_segments = digit_to_segments(level);
+    assign level_box_fill = bright &&
+                            (hc >= 10'd700) && (hc <= 10'd778) &&
+                            (vc >= 10'd42)  && (vc <= 10'd100) &&
+                            ((hc <= 10'd703) || (hc >= 10'd775) ||
+                             (vc <= 10'd45)  || (vc >= 10'd97));
+
+    assign level_seg_a = (hc >= 10'd727) && (hc <= 10'd760) && (vc >= 10'd53) && (vc <= 10'd57);
+    assign level_seg_b = (hc >= 10'd756) && (hc <= 10'd760) && (vc >= 10'd57) && (vc <= 10'd73);
+    assign level_seg_c = (hc >= 10'd756) && (hc <= 10'd760) && (vc >= 10'd73) && (vc <= 10'd89);
+    assign level_seg_d = (hc >= 10'd727) && (hc <= 10'd760) && (vc >= 10'd89) && (vc <= 10'd93);
+    assign level_seg_e = (hc >= 10'd727) && (hc <= 10'd731) && (vc >= 10'd73) && (vc <= 10'd89);
+    assign level_seg_f = (hc >= 10'd727) && (hc <= 10'd731) && (vc >= 10'd57) && (vc <= 10'd73);
+    assign level_seg_g = (hc >= 10'd727) && (hc <= 10'd760) && (vc >= 10'd71) && (vc <= 10'd75);
+
+    assign level_digit_fill = bright &&
+                              ((level_segments[6] && level_seg_a) ||
+                               (level_segments[5] && level_seg_b) ||
+                               (level_segments[4] && level_seg_c) ||
+                               (level_segments[3] && level_seg_d) ||
+                               (level_segments[2] && level_seg_e) ||
+                               (level_segments[1] && level_seg_f) ||
+                               (level_segments[0] && level_seg_g));
 
     // -------------------------------------------------------
     // Seven-segment display
