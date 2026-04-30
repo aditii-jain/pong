@@ -123,7 +123,7 @@ module vga_top(
     wire [11:0] background;
     wire [9:0]  paddle_left, paddle_right, paddle_top, paddle_bottom;
     wire        paddle_hit0, paddle_hit1, paddle_hit2, paddle_hit3;
-    wire        level_box_fill, level_digit_fill;
+    wire        level_box_fill, level_label_fill, level_digit_fill;
     wire [11:0] level_rgb;
     wire [6:0]  level_segments;
     wire        level_seg_a, level_seg_b, level_seg_c, level_seg_d;
@@ -275,7 +275,7 @@ module vga_top(
                        (ball3_rgb != 12'b0000_0000_0000) ? ball3_rgb :
                        12'b0000_0000_0000;
 
-    assign level_rgb = level_digit_fill ? 12'b0000_1111_1111 :
+    assign level_rgb = (level_label_fill || level_digit_fill) ? 12'b0000_1111_1111 :
                        level_box_fill   ? 12'b1111_1111_1111 :
                        12'b0000_0000_0000;
 
@@ -331,33 +331,57 @@ module vga_top(
         end
     end
 
-    // Level 1 starts at score 10. New balls spawn at levels 1, 2, and 3.
-    assign level        = ((score / 14'd10) >= 14'd4) ? 4'd4 : (score / 14'd10);
-    assign ball1_active = (level >= 4'd1);
-    assign ball2_active = (level >= 4'd2);
-    assign ball3_active = (level >= 4'd3);
+    // Start at level 1. Scores 10, 20, and 30 add balls 2, 3, and 4.
+    assign level        = ((score / 14'd10) >= 14'd3) ? 4'd4 : ((score / 14'd10) + 4'd1);
+    assign ball1_active = (level >= 4'd2);
+    assign ball2_active = (level >= 4'd3);
+    assign ball3_active = (level >= 4'd4);
 
     // Difficulty ramps with score and allows overlapping milestones.
     assign ball_speed_level    = (score / 14'd5 >= 14'd4) ? 4'd4 : (score / 14'd5);
     assign paddle_shrink_level = (score / 14'd7 >= 14'd7) ? 4'd7 : (score / 14'd7);
 
     // -------------------------------------------------------
-    // VGA level display: boxed seven-segment digit in top-right
+    // VGA level display: boxed "LEVEL N" in top-right
     // -------------------------------------------------------
     assign level_segments = digit_to_segments(level);
     assign level_box_fill = bright &&
-                            (hc >= 10'd700) && (hc <= 10'd778) &&
+                            (hc >= 10'd620) && (hc <= 10'd778) &&
                             (vc >= 10'd42)  && (vc <= 10'd100) &&
-                            ((hc <= 10'd703) || (hc >= 10'd775) ||
+                            ((hc <= 10'd623) || (hc >= 10'd775) ||
                              (vc <= 10'd45)  || (vc >= 10'd97));
 
-    assign level_seg_a = (hc >= 10'd727) && (hc <= 10'd760) && (vc >= 10'd53) && (vc <= 10'd57);
-    assign level_seg_b = (hc >= 10'd756) && (hc <= 10'd760) && (vc >= 10'd57) && (vc <= 10'd73);
-    assign level_seg_c = (hc >= 10'd756) && (hc <= 10'd760) && (vc >= 10'd73) && (vc <= 10'd89);
-    assign level_seg_d = (hc >= 10'd727) && (hc <= 10'd760) && (vc >= 10'd89) && (vc <= 10'd93);
-    assign level_seg_e = (hc >= 10'd727) && (hc <= 10'd731) && (vc >= 10'd73) && (vc <= 10'd89);
-    assign level_seg_f = (hc >= 10'd727) && (hc <= 10'd731) && (vc >= 10'd57) && (vc <= 10'd73);
-    assign level_seg_g = (hc >= 10'd727) && (hc <= 10'd760) && (vc >= 10'd71) && (vc <= 10'd75);
+    assign level_label_fill = bright &&
+                              (
+                               // L
+                               (((hc >= 10'd632) && (hc <= 10'd635) && (vc >= 10'd56) && (vc <= 10'd82)) ||
+                                ((hc >= 10'd632) && (hc <= 10'd648) && (vc >= 10'd79) && (vc <= 10'd82))) ||
+                               // E
+                               (((hc >= 10'd654) && (hc <= 10'd657) && (vc >= 10'd56) && (vc <= 10'd82)) ||
+                                ((hc >= 10'd654) && (hc <= 10'd670) && (vc >= 10'd56) && (vc <= 10'd59)) ||
+                                ((hc >= 10'd654) && (hc <= 10'd668) && (vc >= 10'd68) && (vc <= 10'd71)) ||
+                                ((hc >= 10'd654) && (hc <= 10'd670) && (vc >= 10'd79) && (vc <= 10'd82))) ||
+                               // V, drawn as a blocky V so it synthesizes cleanly.
+                               (((hc >= 10'd676) && (hc <= 10'd679) && (vc >= 10'd56) && (vc <= 10'd70)) ||
+                                ((hc >= 10'd690) && (hc <= 10'd693) && (vc >= 10'd56) && (vc <= 10'd70)) ||
+                                ((hc >= 10'd680) && (hc <= 10'd689) && (vc >= 10'd71) && (vc <= 10'd82))) ||
+                               // E
+                               (((hc >= 10'd700) && (hc <= 10'd703) && (vc >= 10'd56) && (vc <= 10'd82)) ||
+                                ((hc >= 10'd700) && (hc <= 10'd716) && (vc >= 10'd56) && (vc <= 10'd59)) ||
+                                ((hc >= 10'd700) && (hc <= 10'd714) && (vc >= 10'd68) && (vc <= 10'd71)) ||
+                                ((hc >= 10'd700) && (hc <= 10'd716) && (vc >= 10'd79) && (vc <= 10'd82))) ||
+                               // L
+                               (((hc >= 10'd722) && (hc <= 10'd725) && (vc >= 10'd56) && (vc <= 10'd82)) ||
+                                ((hc >= 10'd722) && (hc <= 10'd738) && (vc >= 10'd79) && (vc <= 10'd82)))
+                              );
+
+    assign level_seg_a = (hc >= 10'd750) && (hc <= 10'd768) && (vc >= 10'd56) && (vc <= 10'd59);
+    assign level_seg_b = (hc >= 10'd765) && (hc <= 10'd768) && (vc >= 10'd59) && (vc <= 10'd69);
+    assign level_seg_c = (hc >= 10'd765) && (hc <= 10'd768) && (vc >= 10'd69) && (vc <= 10'd82);
+    assign level_seg_d = (hc >= 10'd750) && (hc <= 10'd768) && (vc >= 10'd82) && (vc <= 10'd85);
+    assign level_seg_e = (hc >= 10'd750) && (hc <= 10'd753) && (vc >= 10'd69) && (vc <= 10'd82);
+    assign level_seg_f = (hc >= 10'd750) && (hc <= 10'd753) && (vc >= 10'd59) && (vc <= 10'd69);
+    assign level_seg_g = (hc >= 10'd750) && (hc <= 10'd768) && (vc >= 10'd68) && (vc <= 10'd71);
 
     assign level_digit_fill = bright &&
                               ((level_segments[6] && level_seg_a) ||
