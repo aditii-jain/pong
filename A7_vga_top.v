@@ -186,6 +186,7 @@ module vga_top(
         .START_VY(-11'sd1)
     ) ball0_ctrl(
         .clk           (move_clk),
+        .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
         .enable        (1'b1),
@@ -209,6 +210,7 @@ module vga_top(
         .START_VY(11'sd1)
     ) ball1_ctrl(
         .clk           (move_clk),
+        .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
         .enable        (ball1_active),
@@ -232,6 +234,7 @@ module vga_top(
         .START_VY(11'sd1)
     ) ball2_ctrl(
         .clk           (move_clk),
+        .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
         .enable        (ball2_active),
@@ -255,6 +258,7 @@ module vga_top(
         .START_VY(-11'sd1)
     ) ball3_ctrl(
         .clk           (move_clk),
+        .pixel_clk     (ClkPort),
         .bright        (bright),
         .rst           (BtnC),
         .enable        (ball3_active),

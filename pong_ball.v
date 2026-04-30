@@ -8,6 +8,7 @@ module pong_ball #(
     parameter signed [10:0] START_VY = -11'sd1
 )(
     input clk, // slow movement clock, similar to block_controller
+    input pixel_clk,
     input bright,
     input rst,
     input enable,
@@ -30,7 +31,7 @@ module pong_ball #(
     localparam [9:0] V_MIN = 10'd35;
     localparam [9:0] V_MAX = 10'd515;
 
-    localparam signed [10:0] BALL_HALF_SIZE = 11'sd5; // 10x10 block
+    localparam signed [10:0] BALL_HALF_SIZE = 11'sd15; // 30x30 sprite
 
     localparam [11:0] BG_COLOR   = 12'b0000_0000_0000; // black
 
@@ -47,34 +48,53 @@ module pong_ball #(
     reg signed [10:0] speed_step;
 
     wire ball_fill;
+    wire sprite_pixel_on;
     wire paddle_hit;
     wire signed [10:0] ball_left;
     wire signed [10:0] ball_right;
     wire signed [10:0] ball_top;
     wire signed [10:0] ball_bottom;
-    wire [9:0] draw_x;
-    wire [9:0] draw_y;
+    wire signed [10:0] h_signed;
+    wire signed [10:0] v_signed;
+    wire signed [10:0] sprite_col_full;
+    wire signed [10:0] sprite_row_full;
+    wire [4:0] sprite_col;
+    wire [4:0] sprite_row;
+    wire [11:0] sprite_color;
+
+    pong_sprite_rom ball_sprite(
+        .clk        (pixel_clk),
+        .row        (sprite_row),
+        .col        (sprite_col),
+        .color_data (sprite_color)
+    );
 
     // Draw ball or background; force black outside active display.
     always @(*) begin
         if (~bright)
             rgb = 12'b0000_0000_0000;
-        else if (enable && ball_fill)
-            rgb = BALL_COLOR;
+        else if (enable && ball_fill && sprite_pixel_on)
+            rgb = sprite_color;
         else
             rgb = background;
     end
 
-    assign draw_x = xpos[9:0];
-    assign draw_y = ypos[9:0];
+    assign h_signed = $signed({1'b0, hCount});
+    assign v_signed = $signed({1'b0, vCount});
 
-    assign ball_fill = (vCount >= (draw_y - BALL_HALF_SIZE[9:0])) && (vCount <= (draw_y + BALL_HALF_SIZE[9:0])) &&
-                       (hCount >= (draw_x - BALL_HALF_SIZE[9:0])) && (hCount <= (draw_x + BALL_HALF_SIZE[9:0]));
+    assign ball_fill = (v_signed >= ball_top)  && (v_signed <= ball_bottom) &&
+                       (h_signed >= ball_left) && (h_signed <= ball_right);
+    assign sprite_pixel_on = (sprite_color != BG_COLOR);
+
+    assign sprite_col_full = h_signed - ball_left;
+    assign sprite_row_full = v_signed - ball_top;
+    assign sprite_col = sprite_col_full[4:0];
+    assign sprite_row = sprite_row_full[4:0];
 
     assign ball_left   = xpos - BALL_HALF_SIZE;
-    assign ball_right  = xpos + BALL_HALF_SIZE;
+    assign ball_right  = xpos + BALL_HALF_SIZE - 11'sd1;
     assign ball_top    = ypos - BALL_HALF_SIZE;
-    assign ball_bottom = ypos + BALL_HALF_SIZE;
+    assign ball_bottom = ypos + BALL_HALF_SIZE - 11'sd1;
 
     // Only count as a paddle collision when the ball is travelling downward (vy > 0).
     assign paddle_hit = enable && (vy > 0) &&
